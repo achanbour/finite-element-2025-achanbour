@@ -20,7 +20,7 @@ def lagrange_points(cell, degree):
 
     # first, add the vertices of the cell (d=0)
     vertices = cell.vertices
-    lagrange_points = np.asarray(vertices, dtype=np.double)
+    l_points = np.asarray(vertices, dtype=np.double)
 
     # then add the edge points  (d=1)
     intervals = dict(sorted(cell.topology[1].items())) # sort by key to ensure consistent ordering
@@ -29,9 +29,9 @@ def lagrange_points(cell, degree):
         x1 = vertices[edge[1]]
         
         # create p - 1 equispaced points on the edge between x0 and x1
-        edge_points = np.linspace(x0, x1, degree + 1)[1:-1]  # exclude endpoints
-        if edge_points.size != 0:
-            lagrange_points = np.concatenate((lagrange_points, edge_points))
+        e_points = np.linspace(x0, x1, degree + 1)[1:-1]  # exclude endpoints
+        if e_points.size != 0:
+            l_points = np.concatenate((l_points, e_points))
 
     # finally, add the interior points in arbitrary order (d=2)
     # interior points are arranged on a regular grid so they lie on the interpolation of two edge points with same y-coordinate.
@@ -43,9 +43,9 @@ def lagrange_points(cell, degree):
             x_end = [num_interval_points - 1, i] # before last point on the row
 
             interior_points = 1 / degree * np.linspace(x_0, x_end, num_interval_points)[1:-1] 
-            lagrange_points = np.concatenate((lagrange_points, interior_points))
+            l_points = np.concatenate((l_points, interior_points))
 
-    return lagrange_points
+    return l_points
 
 def vandermonde_matrix(cell, degree, points, grad=False):
     """Construct the generalised Vandermonde matrix for polynomials of the
@@ -62,8 +62,22 @@ def vandermonde_matrix(cell, degree, points, grad=False):
     <ex-vandermonde>`.
     """
 
-    raise NotImplementedError
+    from itertools import product
 
+    # powers for 2D
+    # powers = [(i,j) for i in range(degree+1) for j in range(degree+1-i)] 
+    # generalised to any dimension using multi-indices
+    powers = [alpha for alpha in product(range(degree+1), repeat=cell.dim) if sum(alpha) <= degree]
+    powers.sort(key=lambda alpha: (sum(alpha), tuple(reversed(alpha)))) # sort by total degree, then lexicographically but in a reversed way (i.e., decreasing x and increasing y)
+
+    num_points = points.shape[0]
+    V = np.zeros((num_points, len(powers)))
+
+    for idx, alpha in enumerate(powers):
+        # V[:, idx] = points[:, 0] ** i * points[:, 1] ** j # only works for 2D
+        V[:, idx] = np.prod(points ** alpha , axis=1)  # generalised to any dimension
+
+    return V
 
 class FiniteElement(object):
     def __init__(self, cell, degree, nodes, entity_nodes=None):
