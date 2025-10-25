@@ -2,7 +2,6 @@ import numpy as np
 from .reference_elements import ReferenceInterval, ReferenceTriangle
 np.seterr(invalid='ignore', divide='ignore')
 
-
 def lagrange_points(cell, degree):
     """Construct the locations of the equispaced Lagrange nodes on cell.
 
@@ -16,9 +15,37 @@ def lagrange_points(cell, degree):
     <ex-lagrange-points>`.
 
     """
+    # First generate the set of points {(i/p, j/p): 0 <= i+j <= p}
+    # Then place these points on the reference cell in topological order
 
-    raise NotImplementedError
+    # first, add the vertices of the cell (d=0)
+    vertices = cell.vertices
+    lagrange_points = np.asarray(vertices, dtype=np.double)
 
+    # then add the edge points  (d=1)
+    intervals = dict(sorted(cell.topology[1].items())) # sort by key to ensure consistent ordering
+    for edge in intervals.values():
+        x0 = vertices[edge[0]]
+        x1 = vertices[edge[1]]
+        
+        # create p - 1 equispaced points on the edge between x0 and x1
+        edge_points = np.linspace(x0, x1, degree + 1)[1:-1]  # exclude endpoints
+        if edge_points.size != 0:
+            lagrange_points = np.concatenate((lagrange_points, edge_points))
+
+    # finally, add the interior points in arbitrary order (d=2)
+    # interior points are arranged on a regular grid so they lie on the interpolation of two edge points with same y-coordinate.
+    if cell.dim == 2 and degree >= 3:
+        for i in range(1, degree - 1):
+            x_0 = [0., i] # first interval point has x-coord. 0 and y-coord i.
+            
+            num_interval_points = degree - i + 1
+            x_end = [num_interval_points - 1, i] # before last point on the row
+
+            interior_points = 1 / degree * np.linspace(x_0, x_end, num_interval_points)[1:-1] 
+            lagrange_points = np.concatenate((lagrange_points, interior_points))
+
+    return lagrange_points
 
 def vandermonde_matrix(cell, degree, points, grad=False):
     """Construct the generalised Vandermonde matrix for polynomials of the
