@@ -63,7 +63,6 @@ def vandermonde_matrix(cell, degree, points, grad=False):
     """
 
     from itertools import product
-
     # powers for 2D
     # powers = [(i,j) for i in range(degree+1) for j in range(degree+1-i)] 
     # generalised to any dimension using multi-indices
@@ -76,6 +75,23 @@ def vandermonde_matrix(cell, degree, points, grad=False):
     for idx, alpha in enumerate(powers):
         # V[:, idx] = points[:, 0] ** i * points[:, 1] ** j # only works for 2D
         V[:, idx] = np.prod(points ** alpha , axis=1)  # generalised to any dimension
+    
+    # If grad is True, replace each entry by a vector of partial derivatives
+    if grad:
+        # Gradient of Vandermonde shape (num_points, len(powers), dim)
+        V_grad = np.zeros((num_points, len(powers), cell.dim))
+
+        for j, alpha in enumerate(powers):
+            # Compute the gradient of the monomial analytically:
+            # d/dx_k (x_1^{alpha_1} ... x_d^{alpha_d}) = alpha_k * x_k^{alpha_k-1} * Π_{l≠k} x_l^{α_l}
+            for k in range(cell.dim):
+                grad_alpha = np.array(alpha, dtype=int) 
+                if grad_alpha[k] > 0:
+                    grad_alpha[k] -= 1 # decrement the k-th entry power
+                    V_grad[:, j, k] = alpha[k] * np.prod(points ** grad_alpha, axis=1)
+                else:
+                    V_grad[:, j, k] = 0.0 # derivative is zero if power is zero
+        return V_grad
 
     return V
 
