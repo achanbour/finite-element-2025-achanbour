@@ -218,4 +218,23 @@ class LagrangeElement(FiniteElement):
         # have obtained nodes, the following line will call the
         # __init__ method on the FiniteElement class to set up the
         # basis coefficients.
-        super(LagrangeElement, self).__init__(cell, degree, nodes)
+
+        # Assuming Lagrange are listed in entity order.
+        import math
+
+        """A dictionary of dictionaries that lists the nodes associated with 
+        each topological entity in the reference cell."""
+        entity_nodes = {}
+
+
+        node_idx = 0 # tracks the index in the nodes array
+
+        for d in range(cell.dim + 1): # loop over entity dimensions
+            num_entity_nodes = math.comb(degree - 1, d) # number of nodes required to be associated with each entity of dim. d
+            entity_nodes[d] = {}
+
+            for i in range(cell.entity_counts[d]): # loop over entities of dimension d
+                entity_nodes[d][i] = [node_idx + k for k in range(num_entity_nodes)] # assign the lagrange points in order
+                node_idx += num_entity_nodes # advance the point nodes       
+        
+        super(LagrangeElement, self).__init__(cell, degree, nodes, entity_nodes=entity_nodes)
