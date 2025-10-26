@@ -167,9 +167,11 @@ class FiniteElement(object):
         # Compute the Vandermonde matrix at the points provided
         V = vandermonde_matrix(self.cell, self.degree, points, grad=grad)
 
-        # Define the tabulation matrix by multiplying V by the basis coefficient matrix C
-        T = V @ self.basis_coefs
-
+        if grad:
+            T = np.einsum('ijk,jl->ilk', V, self.basis_coefs)  # use Einstein summation to handle rank 3 array
+        else:
+            # Define the tabulation matrix by multiplying V by the basis coefficient matrix C
+            T = V @ self.basis_coefs
         return T
 
     def interpolate(self, fn):
@@ -187,7 +189,9 @@ class FiniteElement(object):
 
         """
 
-        raise NotImplementedError
+        fn_values = np.array([fn(node) for node in self.nodes])
+
+        return fn_values
 
     def __repr__(self):
         return "%s(%s, %s)" % (self.__class__.__name__,
