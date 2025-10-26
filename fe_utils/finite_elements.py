@@ -148,8 +148,13 @@ class FiniteElement(object):
         <ex-tabulate>`.
 
         """
+        # Compute the Vandermonde matrix at the points provided
+        V = vandermonde_matrix(self.cell, self.degree, points, grad=grad)
 
-        raise NotImplementedError
+        # Define the tabulation matrix by multiplying V by the basis coefficient matrix C
+        T = V @ self.basis_coefs
+
+        return T
 
     def interpolate(self, fn):
         """Interpolate fn onto this finite element by evaluating it
@@ -188,7 +193,7 @@ class LagrangeElement(FiniteElement):
         <ex-lagrange-element>`.
         """
 
-        raise NotImplementedError
+        nodes = lagrange_points(cell, degree)
         # Use lagrange_points to obtain the set of nodes.  Once you
         # have obtained nodes, the following line will call the
         # __init__ method on the FiniteElement class to set up the
