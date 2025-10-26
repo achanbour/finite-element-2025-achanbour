@@ -39,21 +39,24 @@ class Mesh(object):
             meshes)."""
 
             # Invert self.edge_vertices so that it is possible to look up
-            # the edge index given the vertex indices.
+            # the edge index given the vertex indices (in both orders).
             edge_dict = {tuple(e): i
                          for i, e_ in enumerate(self.edge_vertices)
                          for e in (e_, reversed(e_))}
 
             # List the local vertex indices associated with
             # each local edge index.
-            local_edge_vertices = np.array([[1, 2], [0, 2], [0, 1]])
+            local_edge_vertices = np.array([[1, 2], [0, 2], [0, 1]]) # which local vertices form which local edge.
 
             self.cell_edges = np.fromiter(
-                (edge_dict[tuple(t.take(local_edge_vertices[e]))]
-                 for t in self.cell_vertices
-                 for e in range(3)),
+                # local_edge_vertices[..] gives the local pair of nodes forming edge e of triangle t
+                # t.take(...) gets the global vertex indices
+                # edge_dict retrieves the edge index
+                (edge_dict[tuple(t.take(local_edge_vertices[e]))] 
+                 for t in self.cell_vertices # for global vertices composing triangle t
+                 for e in range(3)), # loop over its edges 0,1,2
                 dtype=np.int32,
-                count=self.cell_vertices.size).reshape((-1, 3))
+                count=self.cell_vertices.size).reshape((-1, 3)) # collects all edges and reshapes the output to (num_cells, 3)
             """The indices of the edges incident to each cell (only for 2D
             meshes)."""
 
