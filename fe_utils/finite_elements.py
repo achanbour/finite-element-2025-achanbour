@@ -61,6 +61,7 @@ def vandermonde_matrix(cell, degree, points, grad=False):
     The implementation of this function is left as an :ref:`exercise
     <ex-vandermonde>`.
     """
+    points = np.asarray(points, dtype=np.double)
 
     from itertools import product
     # powers for 2D
@@ -68,7 +69,8 @@ def vandermonde_matrix(cell, degree, points, grad=False):
     # generalised to any dimension using multi-indices
     powers = [alpha for alpha in product(range(degree+1), repeat=cell.dim) if sum(alpha) <= degree]
     powers.sort(key=lambda alpha: (sum(alpha), tuple(reversed(alpha)))) # sort by total degree, then lexicographically but in a reversed way (i.e., decreasing x and increasing y)
-
+    powers = np.array(powers, dtype=int)
+    
     num_points = points.shape[0]
     V = np.zeros((num_points, len(powers)))
 
@@ -168,7 +170,7 @@ class FiniteElement(object):
         V = vandermonde_matrix(self.cell, self.degree, points, grad=grad)
 
         if grad:
-            T = np.einsum('ijk,jl->ilk', V, self.basis_coefs)  # use Einstein summation to handle rank 3 array
+            T = np.einsum('ijk,jl->ilk', V, self.basis_coefs)  # use Einstein summation to handle a rank 3 array
         else:
             # Define the tabulation matrix by multiplying V by the basis coefficient matrix C
             T = V @ self.basis_coefs
