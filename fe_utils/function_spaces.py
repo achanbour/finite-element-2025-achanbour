@@ -34,7 +34,7 @@ class FunctionSpace(object):
                                for delta in range(d)))
 
         # Total number of nodes per cell
-        num_cell_nodes = np.sum(
+        num_cell_nodes = sum(
             ref_cell.entity_counts[delta] * self.element.nodes_per_entity[delta]
             for delta in range(dim + 1)
         )
@@ -100,20 +100,20 @@ class Function(object):
 
         """
 
-        fs = self.function_space
+        fs = self.function_space # get the function space we're interpolating onto
 
         # Create a map from the vertices to the element nodes on the
         # reference cell.
-        cg1 = LagrangeElement(fs.element.cell, 1)
-        coord_map = cg1.tabulate(fs.element.nodes)
-        cg1fs = FunctionSpace(fs.mesh, cg1)
+        cg1 = LagrangeElement(fs.element.cell, 1) # create a linear Lagrange element on the reference cell
+        coord_map = cg1.tabulate(fs.element.nodes) # evaluate the linear basis functions at the node points (matrix A)
+        cg1fs = FunctionSpace(fs.mesh, cg1) # define a new function space from the linear finite element 
 
-        for c in range(fs.mesh.entity_counts[-1]):
+        for c in range(fs.mesh.entity_counts[-1]): # iterate over each cell in the mesh 
             # Interpolate the coordinates to the cell nodes.
-            vertex_coords = fs.mesh.vertex_coords[cg1fs.cell_nodes[c, :], :]
-            node_coords = np.dot(coord_map, vertex_coords)
+            vertex_coords = fs.mesh.vertex_coords[cg1fs.cell_nodes[c, :], :] # get the global vertex coordinates of cell c using the cell_nodes of the linear function space
+            node_coords = np.dot(coord_map, vertex_coords) # global node coordinates = A * vertex_coords 
 
-            self.values[fs.cell_nodes[c, :]] = [fn(x) for x in node_coords]
+            self.values[fs.cell_nodes[c, :]] = [fn(x) for x in node_coords] # evaluate fn at the global node coordinates of cell c
 
     def plot(self, subdivisions=None):
         """Plot the value of this :class:`Function`. This is quite a low
