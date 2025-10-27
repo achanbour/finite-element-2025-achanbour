@@ -23,15 +23,43 @@ class FunctionSpace(object):
         #: The :class:`~.finite_elements.FiniteElement` of this space.
         self.element = element
 
-        raise NotImplementedError
+        
+        cell_counts = mesh.entity_counts[-1]
+        ref_cell = mesh.cell
+        dim = ref_cell.dim
+        
+        # Global numbering
+        g = lambda d, i: (i * element.nodes_per_entity[d]
+                         + sum(self.element.nodes_per_entity[delta] * self.mesh.entity_counts[delta]
+                               for delta in range(d)))
 
+        # Total number of nodes per cell
+        num_cell_nodes = np.sum(
+            ref_cell.entity_counts[delta] * self.element.nodes_per_entity[delta]
+            for delta in range(dim + 1)
+        )
+        
+        cell_nodes = np.zeros((cell_counts, num_cell_nodes), dtype=np.int32)
+
+        for c in range(cell_counts): # iterate over each cell
+            col_offset = 0 # column offset to write entries sequentially in each row of self.cell_nodes
+            for delta in range(dim+1): # iterate over each entity dim.
+                num_entity_nodes = self.element.nodes_per_entity[delta] # number of nodes for each entity of dim. delta
+                for epsilon in range(ref_cell.entity_counts[delta]): # iterate over each entity of that dimension (local index)
+                    i = self.mesh.adjacency(dim, delta)[c, epsilon] # get the global entity index using the adjacency function
+                    # compute the starting global node index for that entity
+                    cell_nodes[c, col_offset: col_offset + num_entity_nodes] = [
+                        g(delta, i) + k for k in range(num_entity_nodes)
+                    ]
+                    col_offset += num_entity_nodes
+        
         # Implement global numbering in order to produce the global
         # cell node list for this space.
         #: The global cell node list. This is a two-dimensional array in
         #: which each row lists the global nodes incident to the corresponding
         #: cell. The implementation of this member is left as an
         #: :ref:`exercise <ex-function-space>`
-        self.cell_nodes = None
+        self.cell_nodes = cell_nodes
 
         #: The total number of nodes in the function space.
         self.node_count = np.dot(element.nodes_per_entity, mesh.entity_counts)
