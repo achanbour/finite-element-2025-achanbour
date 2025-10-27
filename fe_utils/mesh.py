@@ -2,7 +2,7 @@ from scipy.spatial import Delaunay
 import numpy as np
 import itertools
 from .reference_elements import ReferenceTriangle, ReferenceInterval
-
+from .finite_elements import LagrangeElement
 
 class Mesh(object):
     """A one or two dimensional mesh composed of intervals or triangles
@@ -75,6 +75,11 @@ class Mesh(object):
         #: :class:`Mesh` is composed.
         self.cell = (0, ReferenceInterval, ReferenceTriangle)[self.dim]
 
+        # Precompute the derivatives of the degree 1 Lagrange element (CG1) defined on the reference cell.
+        # Since the CG1 basis functions are linear, their derivatives are constant so they can be evaluated at any point (e.g., at the reference origin X = 0).
+        cg1 = LagrangeElement(self.cell, 1)
+        self.grad_psi = cg1.tabulate(np.zeros((1, self.dim)), grad=True)[0] # select the first (and only) point
+
     def adjacency(self, dim1, dim2):
         """Return the set of `dim2` entities adjacent to each `dim1`
         entity. For example if `dim1==2` and `dim2==1` then return the list of
@@ -115,7 +120,10 @@ class Mesh(object):
         :result: The Jacobian for cell ``c``.
         """
 
-        raise NotImplementedError
+        vertices = self.cell_vertices[c]
+        # self.grad_psi is of shape (nodes, dim)
+        # self.vertex_coords[vertices, :] is of shape (nodes, dim)
+        return self.vertex_coords[vertices, :].T @ self.grad_psi
 
 
 class UnitIntervalMesh(Mesh):
