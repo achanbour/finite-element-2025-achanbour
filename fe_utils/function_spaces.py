@@ -1,6 +1,7 @@
 import numpy as np
 from . import ReferenceTriangle, ReferenceInterval
 from .finite_elements import LagrangeElement, lagrange_points
+from .quadrature import gauss_quadrature
 from matplotlib import pyplot as plt
 from matplotlib.tri import Triangulation
 
@@ -22,11 +23,16 @@ class FunctionSpace(object):
         self.mesh = mesh
         #: The :class:`~.finite_elements.FiniteElement` of this space.
         self.element = element
-
         
-        cell_counts = mesh.entity_counts[-1]
+        # Implement global numbering in order to produce the global
+        # cell node list for this space.
+        #: The global cell node list. This is a two-dimensional array in
+        #: which each row lists the global nodes incident to the corresponding
+        #: cell. The implementation of this member is left as an
+        #: :ref:`exercise <ex-function-space>`
+        n_cells = mesh.entity_counts[-1]
         ref_cell = mesh.cell
-        dim = ref_cell.dim
+        c_dim = ref_cell.dim
         
         # Global numbering
         g = lambda d, i: (i * element.nodes_per_entity[d]
@@ -36,29 +42,23 @@ class FunctionSpace(object):
         # Total number of nodes per cell
         num_cell_nodes = sum(
             ref_cell.entity_counts[delta] * self.element.nodes_per_entity[delta]
-            for delta in range(dim + 1)
+            for delta in range(c_dim+1)
         )
         
-        cell_nodes = np.zeros((cell_counts, num_cell_nodes), dtype=np.int32)
+        cell_nodes = np.zeros((n_cells, num_cell_nodes), dtype=np.int32)
 
-        for c in range(cell_counts): # iterate over each cell
-            col_offset = 0 # column offset to write entries sequentially in each row of self.cell_nodes
-            for delta in range(dim+1): # iterate over each entity dim.
+        for c in range(n_cells): # iterate over each cell
+            col_offset = 0 # column offset to write entries sequentially in each row
+            for delta in range(c_dim+1): # iterate over each entity dim.
                 num_entity_nodes = self.element.nodes_per_entity[delta] # number of nodes for each entity of dim. delta
                 for epsilon in range(ref_cell.entity_counts[delta]): # iterate over each entity of that dimension (local index)
-                    i = self.mesh.adjacency(dim, delta)[c, epsilon] # get the global entity index using the adjacency function
+                    i = self.mesh.adjacency(c_dim, delta)[c, epsilon] if delta != c_dim else c # get the global entity index using the adjacency function
                     # compute the starting global node index for that entity
                     cell_nodes[c, col_offset: col_offset + num_entity_nodes] = [
                         g(delta, i) + k for k in range(num_entity_nodes)
                     ]
                     col_offset += num_entity_nodes
-        
-        # Implement global numbering in order to produce the global
-        # cell node list for this space.
-        #: The global cell node list. This is a two-dimensional array in
-        #: which each row lists the global nodes incident to the corresponding
-        #: cell. The implementation of this member is left as an
-        #: :ref:`exercise <ex-function-space>`
+
         self.cell_nodes = cell_nodes
 
         #: The total number of nodes in the function space.
@@ -200,4 +200,28 @@ class Function(object):
 
         :result: The integral (a scalar)."""
 
-        raise NotImplementedError
+        fs = self.function_space
+        fe = fs.element
+
+        # Define a quadrature rule that is exact for the finite element.
+        quad = gauss_quadrature(fe.cell, fe.degree)
+
+        # Tabulate the local basis functions at the quadrature points.
+        # has shape (num_quad_points, num_nodes)
+        phi = fe.tabulate(quad.points) 
+        
+        cell_integrals = np.zeros(fs.mesh.entity_counts[-1])
+        for c in range(fs.mesh.entity_counts[-1]):
+           coefs = self.values[fs.cell_nodes[c, :]] # coefficients of the basis functions for cell c (num_nodes, )
+           
+           # phi @ coefs gives a vector of size (num_quad_points, ) which we then contract with quad_weights of size (num_quad_points, )
+           cell_quad = quad.weights.T @ (phi @ coefs) # scalar
+
+           jacobian = np.absolute(np.linalg.det(fs.mesh.jacobian(c))) # abs. value of the determinant of the Jacobian
+           
+           cell_integrals[c] = cell_quad * jacobian
+
+        return np.sum(cell_integrals)
+
+
+        
