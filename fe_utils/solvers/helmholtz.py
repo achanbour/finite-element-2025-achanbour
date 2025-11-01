@@ -15,11 +15,21 @@ def assemble(fs, f):
     the function space in which to solve and the right hand side
     function."""
 
-    raise NotImplementedError
+    mesh = fs.mesh
+    fe = fs.element
+    degree = fe.degree
+    ref_cell = fe.cell
 
     # Create an appropriate (complete) quadrature rule.
+    quad = gauss_quadrature(ref_cell, degree ** 2)
 
     # Tabulate the basis functions and their gradients at the quadrature points.
+    quad_points = quad.points
+    quad_weights = quad.weights
+
+    phi = fe.tabulate(quad_points, grad=False) # (num_points, num_nodes)
+    phi_grad = fe.tabulate(quad_points, grad=True) # (num_points, num_nodes, dim)
+
 
     # Create the left hand side matrix and right hand side vector.
     # This creates a sparse matrix because creating a dense one may
@@ -28,6 +38,28 @@ def assemble(fs, f):
     l = np.zeros(fs.node_count)
 
     # Now loop over all the cells and assemble A and l
+    for c in range(mesh.entity_counts[-1]):
+        # cell global DOFs
+        c_dofs = fs.cell_nodes[c, :]
+
+        # cell jacobian
+        J = mesh.jacobian(c)
+        detJ = np.abs(np.linalg.det(J))
+        invJ = np.linalg.inv(J)
+
+
+        # RHS:
+        cell_f = phi @ f.values[c_dofs] # contract f with local basis func at quad
+        cell_f_int = np.einsum("qi,q,q->i", phi, cell_f, quad_weights) # contract along quad dim
+
+        l[c_dofs] += cell_f_int * detJ
+
+        # LHS:
+        invJ_phi_grad = np.einsum('da,qid->aiq', invJ, phi_grad) # contract along dim d
+        invJ_phi_grad_squared = np.einsum('aiq,ajq->ijq', invJ_phi_grad, invJ_phi_grad) # contract along dim a
+        phi_squared = np.einsum('qi,qj -> ijq', phi, phi) 
+
+        A[np.ix_(c_dofs, c_dofs)] += ((invJ_phi_grad_squared + phi_squared) @ quad_weights) * detJ # contract along weights
 
     return A, l
 

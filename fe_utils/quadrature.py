@@ -67,7 +67,7 @@ def gauss_quadrature(cell, degree):
         # and change coordinates.
 
         # Gauss-legendre quadrature has degree = 2 * npoints - 1
-        # The extra + 1 deals with truncation.
+        # The extra + 1 deals with truncation when degree is odd (this has the same effect as writing math.ceil((degre + 1 /2)))
         npoints = int((degree + 1 + 1) / 2)
 
         points, weights = leggauss(npoints)

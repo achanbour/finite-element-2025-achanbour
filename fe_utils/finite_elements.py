@@ -15,14 +15,13 @@ def lagrange_points(cell, degree):
     <ex-lagrange-points>`.
 
     """
-    # First generate the set of points {(i/p, j/p): 0 <= i+j <= p}
-    # Then place these points on the reference cell in topological order
+    # Generate points in topological order.
 
-    # first, add the vertices of the cell (d=0)
+    # First, add the vertices of the cell (d=0)
     vertices = cell.vertices
     l_points = np.asarray(vertices, dtype=np.double)
 
-    # then add the edge points  (d=1)
+    # Then add the edge points (d=1)
     intervals = dict(sorted(cell.topology[1].items())) # sort by key to ensure consistent ordering
     for edge in intervals.values():
         x0 = vertices[edge[0]]
@@ -33,7 +32,7 @@ def lagrange_points(cell, degree):
         if e_points.size != 0:
             l_points = np.concatenate((l_points, e_points))
 
-    # finally, add the interior points in arbitrary order (d=2)
+    # Finally, add the interior points in arbitrary order (d=2)
     # interior points are arranged on a regular grid so they lie on the interpolation of two edge points with same y-coordinate.
     if cell.dim == 2 and degree >= 3:
         for i in range(1, degree - 1):
@@ -70,7 +69,7 @@ def vandermonde_matrix(cell, degree, points, grad=False):
     powers = [alpha for alpha in product(range(degree+1), repeat=cell.dim) if sum(alpha) <= degree]
     powers.sort(key=lambda alpha: (sum(alpha), tuple(reversed(alpha)))) # sort by total degree, then lexicographically but in a reversed way (i.e., decreasing x and increasing y)
     powers = np.array(powers, dtype=int)
-    
+
     num_points = points.shape[0]
     V = np.zeros((num_points, len(powers)))
 
