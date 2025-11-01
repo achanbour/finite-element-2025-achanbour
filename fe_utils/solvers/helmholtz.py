@@ -30,7 +30,6 @@ def assemble(fs, f):
     phi = fe.tabulate(quad_points, grad=False) # (num_points, num_nodes)
     phi_grad = fe.tabulate(quad_points, grad=True) # (num_points, num_nodes, dim)
 
-
     # Create the left hand side matrix and right hand side vector.
     # This creates a sparse matrix because creating a dense one may
     # well run your machine out of memory!
@@ -49,17 +48,19 @@ def assemble(fs, f):
 
 
         # RHS:
-        cell_f = phi @ f.values[c_dofs] # contract f with local basis func at quad
-        cell_f_int = np.einsum("qi,q,q->i", phi, cell_f, quad_weights) # contract along quad dim
+        cell_f = phi @ f.values[c_dofs] # contract f with local basis functions evaluated at quad points
+        cell_f_int = np.einsum("qi,q,q->i", phi, cell_f, quad_weights) # contract along quad points, keep result per basis function
 
         l[c_dofs] += cell_f_int * detJ
 
         # LHS:
-        invJ_phi_grad = np.einsum('da,qid->aiq', invJ, phi_grad) # contract along dim d
-        invJ_phi_grad_squared = np.einsum('aiq,ajq->ijq', invJ_phi_grad, invJ_phi_grad) # contract along dim a
-        phi_squared = np.einsum('qi,qj -> ijq', phi, phi) 
+        invJ_phi_grad = np.einsum('da,qid->aqi', invJ, phi_grad) # contract along dim d and output a tensor of shape (dim, num_nodes, num_quad)
+        # contract along dim but keep quad in output (as we need to contract along quad later with the weights)
+        invJ_phi_grad_squared = np.einsum('aqi,aqj->ijq', invJ_phi_grad, invJ_phi_grad)
 
-        A[np.ix_(c_dofs, c_dofs)] += ((invJ_phi_grad_squared + phi_squared) @ quad_weights) * detJ # contract along weights
+        phi_squared = np.einsum('qi,qj -> ijq', phi, phi) # keep quad in output
+
+        A[np.ix_(c_dofs, c_dofs)] += ((invJ_phi_grad_squared + phi_squared) @ quad_weights) * detJ # contract along all 3 dimensions 
 
     return A, l
 
