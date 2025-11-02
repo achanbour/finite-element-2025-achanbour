@@ -46,7 +46,6 @@ def assemble(fs, f):
         detJ = np.abs(np.linalg.det(J))
         invJ = np.linalg.inv(J)
 
-
         # RHS:
         cell_f = phi @ f.values[c_dofs] # contract f with local basis functions evaluated at quad points
         cell_f_int = np.einsum("qi,q,q->i", phi, cell_f, quad_weights) # contract along quad points, keep result per basis function
