@@ -16,8 +16,61 @@ def assemble(fs, f):
     the function space in which to solve and the right hand side
     function."""
 
-    raise NotImplementedError
+    mesh = fs.mesh
+    fe = fs.element
+    degree = fe.degree
+    ref_cell = fe.cell
 
+    # Create a suitable (complete) quadrature rule.
+
+    # The degree of precision is of order degree^2 as the weak form contains
+    # products of derivatives of basis functions 
+    # (poly. of degree degree - 1)
+    quad = gauss_quadrature(ref_cell, degree ** 2)
+    quad_points = quad.points
+    quad_weights = quad.weights
+
+    # Evaluate the derivatives of basis functions at the quad. points
+    phi = fe.tabulate(quad_points, grad=False) # (points, nodes)
+    phi_grad = fe.tabulate(quad_points, grad=True) # (points, nodes, dim)
+
+    # Create the LHS matrix in sparse format
+    # Create the RHS vector
+    A = sp.lil_matrix((fs.node_count, fs.node_count))
+    l = np.zeros(fs.node_count)
+
+    # Step 1: assemble A and l ignoring the Dirichlet BC.
+    for c in range(mesh.entity_counts[-1]):
+        # global nodes lying on cell c
+        c_nodes = fs.cell_nodes[c, :]
+
+        # cell jacobian
+        J = mesh.jacobian(c)
+        detJ = np.abs(np.linalg.det(J)) 
+        invJ = np.linalg.inv(J)
+
+        # RHS same as in Helmholtz pb.
+        f_coefs = f.values[c_nodes]
+        cell_f = np.einsum('qk,k->q', phi, f_coefs) # contract over nodes k
+        cell_f_int = np.einsum('qi,q,q->i', phi, cell_f, quad_weights) # contract over quad q
+        l[c_nodes] += cell_f_int * detJ
+
+        # LHS same as in Helmholtz pb. minus the mass term
+        invJ_phi_grad = np.einsum('da,qid->qia', invJ, phi_grad) # contract along shared dim d
+        invJ_phi_grad_squared = np.einsum('qia,qja->ijq', invJ_phi_grad, invJ_phi_grad) # contract along dim a
+        cell_phi_int = np.einsum('ijq,q->ij', invJ_phi_grad_squared, quad_weights) # contract along quad q
+        A[np.ix_(c_nodes, c_nodes)] += cell_phi_int * detJ
+
+    # Identify boundary nodes.
+    b_nodes = boundary_nodes(fs)
+
+    # Step 2: set boundary rows in l to 0.
+    # Step 3+4: set boundary rows in A to 0 and diagonal entry to 1.
+    l[b_nodes] = 0
+    A[b_nodes, :] = 0
+    A[b_nodes, b_nodes] = 1
+
+    return A, l
 
 def boundary_nodes(fs):
     """Find the list of boundary nodes in fs. This is a
