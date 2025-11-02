@@ -111,7 +111,7 @@ class Function(object):
         for c in range(fs.mesh.entity_counts[-1]): # iterate over each cell in the mesh 
             # Interpolate the coordinates to the cell nodes.
             vertex_coords = fs.mesh.vertex_coords[cg1fs.cell_nodes[c, :], :] # get the global vertex coordinates of cell c using the cell_nodes of the linear function space
-            node_coords = np.dot(coord_map, vertex_coords) # global node coordinates = A * vertex_coords 
+            node_coords = np.dot(coord_map, vertex_coords) # global node coordinates = T * vertex_coords 
 
             self.values[fs.cell_nodes[c, :]] = [fn(x) for x in node_coords] # evaluate fn at the global node coordinates of cell c
 
