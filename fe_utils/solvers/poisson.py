@@ -30,7 +30,7 @@ def assemble(fs, f):
     quad_points = quad.points
     quad_weights = quad.weights
 
-    # Evaluate the derivatives of basis functions at the quad. points
+    # Evaluate the basis functions and their derivatives at the quad. points
     phi = fe.tabulate(quad_points, grad=False) # (points, nodes)
     phi_grad = fe.tabulate(quad_points, grad=True) # (points, nodes, dim)
 
@@ -138,6 +138,46 @@ def solve_poisson(degree, resolution, analytic=False, return_error=False):
     # Return the solution and the error in the solution.
     return u, error
 
+def b(x):
+    """Define the boundary function"""
+    eps = 1e-10
+    if x[1] < eps:              # bottom edge
+        return 1    
+    elif x[1] > 1 - eps:        # top edge
+        return np.exp(x[0])     
+    elif x[0] < eps:            # left edge
+        return 1
+    elif x[0] > 1 - eps:
+        return np.exp(x[1])     # right edge
+    else:
+        return 0.0
+    
+def solve_poisson_initial_guess(resolution, degree=1):
+    mesh = UnitSquareMesh(resolution, resolution)
+    fe = LagrangeElement(mesh.cell, degree)
+    fs = FunctionSpace(mesh, fe)
+
+    # Define the same forcing term used in the 4-Laplacian
+    f = Function(fs)
+    f.interpolate(lambda x: np.exp(3*x[0]*x[1]) *
+                  (3*(x[0]**4) + 6*(x[0]**2)*(x[1]**2) + 4*x[0]*x[1] + 3*x[1]))
+
+    # Assemble and solve the Poisson system
+    A, l = assemble(fs, f)
+
+    # Apply the same Dirichlet BCs as in the 4-Laplacian
+    b_nodes = boundary_nodes(fs)
+    b_node_points = mesh.vertex_coords[b_nodes, :]
+    b_vals = np.array([b(b_node_point) for b_node_point in b_node_points])
+
+    l[b_nodes] = b_vals
+    A[b_nodes, :] = 0
+    A[b_nodes, b_nodes] = 1
+
+    u = Function(fs)
+    A = sp.csr_matrix(A)
+    u.values[:] = splinalg.spsolve(A, l)
+    return u
 
 if __name__ == "__main__":
 
